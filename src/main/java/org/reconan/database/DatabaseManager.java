@@ -31,8 +31,11 @@ public class DatabaseManager {
      * @throws SQLException if a database access error occurs
      */
     public void initialize() throws SQLException {
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement()) {
+        Connection conn = null;
+        Statement stmt = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            stmt = conn.createStatement();
             
             System.out.println("SQL Server: Initializing database schema...");
 
@@ -122,6 +125,8 @@ public class DatabaseManager {
             );
 
             System.out.println("SQL Server: Database schema initialized successfully.");
+        } finally {
+            DatabaseConnection.close(stmt, conn);
         }
     }
 }

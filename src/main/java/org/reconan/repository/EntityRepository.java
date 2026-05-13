@@ -20,22 +20,32 @@ public class EntityRepository {
      * For this OSINT tool, we'll clear and re-save for the specific investigation to ensure sync.
      */
     public void saveAll(int investigationId, List<Entity> entities) {
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
             
             try {
                 // 1. Delete existing properties
                 String deletePropsSql = "DELETE FROM entity_properties WHERE entity_id IN (SELECT id FROM entities WHERE investigation_id = ?)";
-                try (PreparedStatement pstmt = conn.prepareStatement(deletePropsSql)) {
-                    pstmt.setInt(1, investigationId);
-                    pstmt.executeUpdate();
+                PreparedStatement pstmtDelProps = null;
+                try {
+                    pstmtDelProps = conn.prepareStatement(deletePropsSql);
+                    pstmtDelProps.setInt(1, investigationId);
+                    pstmtDelProps.executeUpdate();
+                } finally {
+                    DatabaseConnection.close(pstmtDelProps);
                 }
 
                 // 2. Delete existing entities
                 String deleteEntitiesSql = "DELETE FROM entities WHERE investigation_id = ?";
-                try (PreparedStatement pstmt = conn.prepareStatement(deleteEntitiesSql)) {
-                    pstmt.setInt(1, investigationId);
-                    pstmt.executeUpdate();
+                PreparedStatement pstmtDelEntities = null;
+                try {
+                    pstmtDelEntities = conn.prepareStatement(deleteEntitiesSql);
+                    pstmtDelEntities.setInt(1, investigationId);
+                    pstmtDelEntities.executeUpdate();
+                } finally {
+                    DatabaseConnection.close(pstmtDelEntities);
                 }
 
                 // 3. Insert new entities and their properties
@@ -89,40 +99,49 @@ public class EntityRepository {
         List<Entity> entities = new ArrayList<>();
         String sql = "SELECT id, type, value FROM entities WHERE investigation_id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
             
             pstmt.setInt(1, investigationId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    Entity entity = new Entity(
-                        EntityType.valueOf(rs.getString("type")),
-                        rs.getString("value")
-                    );
-                    entity.setId(rs.getInt("id"));
-                    entity.setInvestigationId(investigationId);
-                    
-                    // Load properties
-                    loadProperties(entity, conn);
-                    
-                    entities.add(entity);
-                }
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Entity entity = new Entity(
+                    EntityType.valueOf(rs.getString("type")),
+                    rs.getString("value")
+                );
+                entity.setId(rs.getInt("id"));
+                entity.setInvestigationId(investigationId);
+                
+                // Load properties
+                loadProperties(entity, conn);
+                
+                entities.add(entity);
             }
         } catch (SQLException e) {
             System.err.println("SQL Server: Error loading entities: " + e.getMessage());
+        } finally {
+            DatabaseConnection.close(rs, pstmt, conn);
         }
         return entities;
     }
 
     private void loadProperties(Entity entity, Connection conn) throws SQLException {
         String sql = "SELECT property_key, property_value FROM entity_properties WHERE entity_id = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, entity.getId());
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    entity.addProperty(rs.getString("property_key"), rs.getString("property_value"));
-                }
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                entity.addProperty(rs.getString("property_key"), rs.getString("property_value"));
             }
+        } finally {
+            DatabaseConnection.close(rs, pstmt);
         }
     }
 }

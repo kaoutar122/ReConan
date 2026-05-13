@@ -21,7 +21,9 @@ public class DatabaseConnection {
 
     // Check if the database connection is successful
     public static void checkConnection() {
-        try (Connection connection = getConnection()) {
+        Connection connection = null;
+        try {
+            connection = getConnection();
             if (connection != null) {
                 System.out.println("SQL Server: Connected to Database Successfully!");
             } else {
@@ -30,6 +32,25 @@ public class DatabaseConnection {
         } catch (SQLException e) {
             // Print connection error
             System.err.println("SQL Server: Database Connection Error: " + e.getMessage());
+        } finally {
+            close(connection);
+        }
+    }
+
+    /**
+     * Safely closes the given database resources.
+     *
+     * @param resources The resources to close (Connection, Statement, ResultSet, etc.)
+     */
+    public static void close(AutoCloseable... resources) {
+        for (AutoCloseable resource : resources) {
+            if (resource != null) {
+                try {
+                    resource.close();
+                } catch (Exception e) {
+                    System.err.println("SQL Server: Error closing resource: " + e.getMessage());
+                }
+            }
         }
     }
 }

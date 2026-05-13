@@ -14,9 +14,13 @@ public class TableRepository {
     public void printAllTables() {
         String query = "SELECT name FROM sys.tables";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery(query);
 
             // Iterate through result set and print table names
             while (rs.next()) {
@@ -25,6 +29,8 @@ public class TableRepository {
         } catch (Exception e) {
             // Handle query or connection errors
             e.printStackTrace();
+        } finally {
+            DatabaseConnection.close(rs, stmt, conn);
         }
     }
 }

@@ -21,8 +21,12 @@ public class InvestigationRepository {
     public Investigation create(Investigation investigation) {
         String sql = "INSERT INTO investigations (name, description, created_at, updated_at) VALUES (?, ?, GETDATE(), GETDATE())";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             
             pstmt.setString(1, investigation.getName());
             pstmt.setString(2, investigation.getDescription());
@@ -30,15 +34,16 @@ public class InvestigationRepository {
             int affectedRows = pstmt.executeUpdate();
             
             if (affectedRows > 0) {
-                try (ResultSet rs = pstmt.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        investigation.setId(rs.getInt(1));
-                        return investigation;
-                    }
+                rs = pstmt.getGeneratedKeys();
+                if (rs.next()) {
+                    investigation.setId(rs.getInt(1));
+                    return investigation;
                 }
             }
         } catch (SQLException e) {
             System.err.println("SQL Server: Error creating investigation: " + e.getMessage());
+        } finally {
+            DatabaseConnection.close(rs, pstmt, conn);
         }
         return null;
     }
@@ -52,9 +57,13 @@ public class InvestigationRepository {
         List<Investigation> investigations = new ArrayList<>();
         String sql = "SELECT id, name, description, created_at, updated_at FROM investigations ORDER BY created_at DESC";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery(sql);
             
             while (rs.next()) {
                 Investigation inv = new Investigation(
@@ -68,6 +77,8 @@ public class InvestigationRepository {
             }
         } catch (SQLException e) {
             System.err.println("SQL Server: Error retrieving investigations: " + e.getMessage());
+        } finally {
+            DatabaseConnection.close(rs, stmt, conn);
         }
         return investigations;
     }
@@ -81,24 +92,29 @@ public class InvestigationRepository {
     public Investigation findById(int id) {
         String sql = "SELECT id, name, description, created_at, updated_at FROM investigations WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            pstmt = conn.prepareStatement(sql);
             
             pstmt.setInt(1, id);
             
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return new Investigation(
-                            rs.getInt("id"),
-                            rs.getString("name"),
-                            rs.getString("description"),
-                            rs.getTimestamp("created_at").toLocalDateTime(),
-                            rs.getTimestamp("updated_at").toLocalDateTime()
-                    );
-                }
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new Investigation(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getTimestamp("created_at").toLocalDateTime(),
+                        rs.getTimestamp("updated_at").toLocalDateTime()
+                );
             }
         } catch (SQLException e) {
             System.err.println("SQL Server: Error retrieving investigation by ID: " + e.getMessage());
+        } finally {
+            DatabaseConnection.close(rs, pstmt, conn);
         }
         return null;
     }
